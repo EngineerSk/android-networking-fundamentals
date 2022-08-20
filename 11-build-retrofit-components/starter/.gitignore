@@ -76,3 +76,5 @@ fastlane/readme.md
 .idea/copyright
 .idea/codeStyles
 .idea/fileTemplates
+/.idea/compiler.xml
+/.idea/vcs.xml

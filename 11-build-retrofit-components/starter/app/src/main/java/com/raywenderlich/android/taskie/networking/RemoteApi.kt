@@ -34,18 +34,15 @@
 
 package com.raywenderlich.android.taskie.networking
 
-import com.google.gson.Gson
 import com.raywenderlich.android.taskie.App
 import com.raywenderlich.android.taskie.model.Task
 import com.raywenderlich.android.taskie.model.UserProfile
 import com.raywenderlich.android.taskie.model.request.AddTaskRequest
 import com.raywenderlich.android.taskie.model.request.UserDataRequest
-import com.raywenderlich.android.taskie.model.response.GetTasksResponse
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
+import com.raywenderlich.android.taskie.model.response.*
+import retrofit2.Call
+import retrofit2.Callback
+import retrofit2.Response
 
 /**
  * Holds decoupled logic for all the API calls.
@@ -53,221 +50,235 @@ import java.net.URL
 
 const val BASE_URL = "https://taskie-rw.herokuapp.com"
 
-class RemoteApi {
+class RemoteApi(private val remoteApiService: RemoteApiService) {
 
-  private val gson = Gson()
-
-  fun loginUser(userDataRequest: UserDataRequest, onUserLoggedIn: (String?, Throwable?) -> Unit) {
-    Thread(Runnable {
-      val connection = URL("$BASE_URL/api/login").openConnection() as HttpURLConnection
-      connection.requestMethod = "POST"
-      connection.setRequestProperty("Content-Type", "application/json")
-      connection.setRequestProperty("Accept", "application/json")
-      connection.readTimeout = 10000
-      connection.connectTimeout = 10000
-      connection.doOutput = true
-      connection.doInput = true
-
-      val body = gson.toJson(userDataRequest)
-
-      val bytes = body.toByteArray()
-
-      try {
-        connection.outputStream.use { outputStream ->
-          outputStream.write(bytes)
-        }
-
-        val reader = InputStreamReader(connection.inputStream)
-
-        reader.use { input ->
-          val response = StringBuilder()
-          val bufferedReader = BufferedReader(input)
-
-          bufferedReader.useLines { lines ->
-            lines.forEach {
-              response.append(it.trim())
+    fun loginUser(userDataRequest: UserDataRequest, onUserLoggedIn: (String?, Throwable?) -> Unit) {
+        remoteApiService.loginUser(userDataRequest).enqueue(object : Callback<LoginResponse> {
+            /**
+             * Invoked for a received HTTP response.
+             *
+             *
+             * Note: An HTTP response may still indicate an application-level failure such as a 404 or 500.
+             * Call [Response.isSuccessful] to determine if the response indicates success.
+             */
+            override fun onResponse(call: Call<LoginResponse>, response: Response<LoginResponse>) {
+                val responseBody = response.body()
+                if (responseBody == null) {
+                    onUserLoggedIn(null, NullPointerException("Unable to login"))
+                    return
+                }
+                if (responseBody.token.isNullOrBlank()) {
+                    onUserLoggedIn(null, NullPointerException("Unable to authenticate user"))
+                } else {
+                    onUserLoggedIn(responseBody.token, null)
+                }
             }
-          }
 
-          val jsonObject = JSONObject(response.toString())
-
-          onUserLoggedIn(jsonObject.getString("token"), null)
-        }
-      } catch (error: Throwable) {
-        onUserLoggedIn(null, error)
-      }
-
-      connection.disconnect()
-    }).start()
-  }
-
-  fun registerUser(userDataRequest: UserDataRequest, onUserCreated: (String?, Throwable?) -> Unit) {
-    Thread(Runnable {
-      val connection = URL("$BASE_URL/api/register").openConnection() as HttpURLConnection
-      connection.requestMethod = "POST"
-      connection.setRequestProperty("Content-Type", "application/json")
-      connection.setRequestProperty("Accept", "application/json")
-      connection.readTimeout = 10000
-      connection.connectTimeout = 10000
-      connection.doOutput = true
-      connection.doInput = true
-
-      val body = gson.toJson(userDataRequest)
-
-      val bytes = body.toByteArray()
-
-      try {
-        connection.outputStream.use { outputStream ->
-          outputStream.write(bytes)
-        }
-
-        val reader = InputStreamReader(connection.inputStream)
-
-        reader.use { input ->
-          val response = StringBuilder()
-          val bufferedReader = BufferedReader(input)
-
-          bufferedReader.useLines { lines ->
-            lines.forEach {
-              response.append(it.trim())
+            /**
+             * Invoked when a network exception occurred talking to the server or when an unexpected exception
+             * occurred creating the request or processing the response.
+             */
+            override fun onFailure(call: Call<LoginResponse>, error: Throwable) {
+                onUserLoggedIn(null, error)
             }
-          }
+        })
+    }
 
-          val jsonObject = JSONObject(response.toString())
+    fun registerUser(
+        userDataRequest: UserDataRequest,
+        onUserCreated: (String?, Throwable?) -> Unit
+    ) {
+        remoteApiService.registerUser(userDataRequest).enqueue(
+            object : Callback<RegisterResponse> {
+                /**
+                 * Invoked for a received HTTP response.
+                 *
+                 *
+                 * Note: An HTTP response may still indicate an application-level failure such as a 404 or 500.
+                 * Call [Response.isSuccessful] to determine if the response indicates success.
+                 */
+                override fun onResponse(
+                    call: Call<RegisterResponse>,
+                    response: Response<RegisterResponse>
+                ) {
+                    val message = response.body()
+                    if (message == null) {
+                        onUserCreated(null, NullPointerException("No response body"))
+                        return
+                    }
+                    onUserCreated(message.message, null)
+                }
+                /**
+                 * Invoked when a network exception occurred talking to the server or when an unexpected exception
+                 * occurred creating the request or processing the response.
+                 */
+                override fun onFailure(call: Call<RegisterResponse>, error: Throwable) {
+                    onUserCreated(null, error)
+                }
 
-          onUserCreated(jsonObject.getString("message"), null)
-        }
-      } catch (error: Throwable) {
-        onUserCreated(null, error)
-      }
-
-      connection.disconnect()
-    }).start()
-  }
-
-  fun getTasks(onTasksReceived: (List<Task>, Throwable?) -> Unit) {
-    Thread(Runnable {
-      val connection = URL("$BASE_URL/api/note").openConnection() as HttpURLConnection
-      connection.requestMethod = "GET"
-      connection.setRequestProperty("Content-Type", "application/json")
-      connection.setRequestProperty("Accept", "application/json")
-      connection.setRequestProperty("Authorization", App.getToken())
-      connection.readTimeout = 10000
-      connection.connectTimeout = 10000
-      connection.doInput = true
-
-      try {
-        val reader = InputStreamReader(connection.inputStream)
-
-        reader.use { input ->
-          val response = StringBuilder()
-          val bufferedReader = BufferedReader(input)
-
-          bufferedReader.useLines { lines ->
-            lines.forEach {
-              response.append(it.trim())
             }
-          }
+        )
+    }
 
-          val tasksResponse = gson.fromJson(response.toString(), GetTasksResponse::class.java)
-          val unfinishedTasks = tasksResponse.notes.filter { !it.isCompleted }
+    fun getTasks(onTasksReceived: (List<Task>, Throwable?) -> Unit) {
+        remoteApiService.getNotes(App.getToken()).enqueue(
+            object : Callback<GetTasksResponse> {
+                /**
+                 * Invoked for a received HTTP response.
+                 *
+                 *
+                 * Note: An HTTP response may still indicate an application-level failure such as a 404 or 500.
+                 * Call [Response.isSuccessful] to determine if the response indicates success.
+                 */
+                override fun onResponse(
+                    call: Call<GetTasksResponse>,
+                    response: Response<GetTasksResponse>
+                ) {
+                    val jsonBody = response.body()
+                    if (jsonBody == null) {
+                        onTasksReceived(emptyList(), NullPointerException("No Data Available"))
+                        return
+                    }
+                    if (jsonBody.notes.isNotEmpty()) {
+                        onTasksReceived(jsonBody.notes.filter { !it.isCompleted }, null)
+                    } else {
+                        onTasksReceived(emptyList(), NullPointerException("No data available"))
+                    }
+                }
 
-          onTasksReceived(unfinishedTasks, null)
-        }
-      } catch (error: Throwable) {
-        onTasksReceived(emptyList(), error)
-      }
-
-      connection.disconnect()
-    }).start()
-  }
-
-  fun deleteTask(onTaskDeleted: (Throwable?) -> Unit) {
-    onTaskDeleted(null)
-  }
-
-  fun completeTask(taskId: String, onTaskCompleted: (Throwable?) -> Unit) {
-    Thread(Runnable {
-      val connection = URL(
-          "$BASE_URL/api/note/complete?id=$taskId"
-      ).openConnection() as HttpURLConnection
-
-      connection.requestMethod = "POST"
-      connection.setRequestProperty("Content-Type", "application/json")
-      connection.setRequestProperty("Accept", "application/json")
-      connection.setRequestProperty("Authorization", App.getToken())
-      connection.readTimeout = 10000
-      connection.connectTimeout = 10000
-      connection.doOutput = true
-      connection.doInput = true
-
-      try {
-        val reader = InputStreamReader(connection.inputStream)
-
-        reader.use { input ->
-          val response = StringBuilder()
-          val bufferedReader = BufferedReader(input)
-
-          bufferedReader.useLines { lines ->
-            lines.forEach {
-              response.append(it.trim())
+                /**
+                 * Invoked when a network exception occurred talking to the server or when an unexpected exception
+                 * occurred creating the request or processing the response.
+                 */
+                override fun onFailure(call: Call<GetTasksResponse>, error: Throwable) {
+                    onTasksReceived(emptyList(), error)
+                }
             }
-          }
+        )
+    }
 
-          onTaskCompleted(null)
-        }
-      } catch (error: Throwable) {
-        onTaskCompleted(error)
-      }
+    fun deleteTask(onTaskDeleted: (Throwable?) -> Unit) {
+        onTaskDeleted(null)
+    }
 
-      connection.disconnect()
-    }).start()
-  }
+    fun completeTask(taskId: String, onTaskCompleted: (Throwable?) -> Unit) {
+        remoteApiService.completeTask(App.getToken(), taskId).enqueue(
+            object : Callback<CompleteNoteResponse> {
+                /**
+                 * Invoked for a received HTTP response.
+                 *
+                 *
+                 * Note: An HTTP response may still indicate an application-level failure such as a 404 or 500.
+                 * Call [Response.isSuccessful] to determine if the response indicates success.
+                 */
+                override fun onResponse(
+                    call: Call<CompleteNoteResponse>,
+                    response: Response<CompleteNoteResponse>
+                ) {
+                    val jsonBody = response.body()
+                    if (jsonBody == null) {
+                        onTaskCompleted(NullPointerException("No response!"))
+                        return
+                    }
 
-  fun addTask(addTaskRequest: AddTaskRequest, onTaskCreated: (Task?, Throwable?) -> Unit) {
-    Thread(Runnable {
-      val connection = URL("$BASE_URL/api/note").openConnection() as HttpURLConnection
-      connection.requestMethod = "POST"
-      connection.setRequestProperty("Content-Type", "application/json")
-      connection.setRequestProperty("Accept", "application/json")
-      connection.setRequestProperty("Authorization", App.getToken())
-      connection.readTimeout = 10000
-      connection.connectTimeout = 10000
-      connection.doOutput = true
-      connection.doInput = true
+                    if (jsonBody.message == null) {
+                        onTaskCompleted(NullPointerException("No response!"))
+                    } else {
+                        onTaskCompleted(null)
+                    }
+                }
 
-      val request = gson.toJson(addTaskRequest)
+                /**
+                 * Invoked when a network exception occurred talking to the server or when an unexpected exception
+                 * occurred creating the request or processing the response.
+                 */
+                override fun onFailure(call: Call<CompleteNoteResponse>, error: Throwable) {
+                    onTaskCompleted(error)
+                }
 
-      try {
-        connection.outputStream.use { outputStream ->
-          outputStream.write(request.toString().toByteArray())
-        }
-
-        val reader = InputStreamReader(connection.inputStream)
-
-        reader.use { input ->
-          val response = StringBuilder()
-          val bufferedReader = BufferedReader(input)
-
-          bufferedReader.useLines { lines ->
-            lines.forEach {
-              response.append(it.trim())
             }
-          }
+        )
+    }
 
-          val task = gson.fromJson(response.toString(), Task::class.java)
+    fun addTask(addTaskRequest: AddTaskRequest, onTaskCreated: (Task?, Throwable?) -> Unit) {
+        remoteApiService.addTask(App.getToken(), addTaskRequest).enqueue(
+            object : Callback<Task> {
+                /**
+                 * Invoked for a received HTTP response.
+                 *
+                 *
+                 * Note: An HTTP response may still indicate an application-level failure such as a 404 or 500.
+                 * Call [Response.isSuccessful] to determine if the response indicates success.
+                 */
+                override fun onResponse(
+                    call: Call<Task>,
+                    response: Response<Task>
+                ) {
+                    val jsonBody = response.body()
+                    if (jsonBody == null) {
+                        onTaskCreated(null, NullPointerException("No response!"))
+                        return
+                    }
+                    onTaskCreated(jsonBody, null)
+                }
 
-          onTaskCreated(task, null)
+                /**
+                 * Invoked when a network exception occurred talking to the server or when an unexpected exception
+                 * occurred creating the request or processing the response.
+                 */
+                override fun onFailure(call: Call<Task>, error: Throwable) {
+                    onTaskCreated(null, error)
+                }
+            }
+        )
+    }
+
+    fun getUserProfile(onUserProfileReceived: (UserProfile?, Throwable?) -> Unit) {
+        getTasks { tasks, error ->
+            if (error != null && error !is NullPointerException) {
+                onUserProfileReceived(null, error)
+                return@getTasks
+            }
+
+            remoteApiService.getUserProfile(App.getToken())
+                .enqueue(object : Callback<UserProfileResponse> {
+                    /**
+                     * Invoked for a received HTTP response.
+                     *
+                     *
+                     * Note: An HTTP response may still indicate an application-level failure such as a 404 or 500.
+                     * Call [Response.isSuccessful] to determine if the response indicates success.
+                     */
+                    override fun onResponse(
+                        call: Call<UserProfileResponse>,
+                        response: Response<UserProfileResponse>
+                    ) {
+                        val responseBody = response.body()
+                        if (responseBody == null) {
+                            onUserProfileReceived(null, NullPointerException("No data available"))
+                            return
+                        }
+                        if (responseBody.email == null || responseBody.name == null) {
+                            onUserProfileReceived(null, NullPointerException("No data available"))
+                        } else {
+                            onUserProfileReceived(
+                                UserProfile(
+                                    responseBody.email, responseBody.name,
+                                    tasks.size
+                                ), null
+                            )
+                        }
+                    }
+
+                    /**
+                     * Invoked when a network exception occurred talking to the server or when an unexpected exception
+                     * occurred creating the request or processing the response.
+                     */
+                    override fun onFailure(call: Call<UserProfileResponse>, error: Throwable) {
+                        onUserProfileReceived(null, error)
+                    }
+
+                })
         }
-      } catch (error: Throwable) {
-        onTaskCreated(null, error)
-      }
-
-      connection.disconnect()
-    }).start()
-  }
-
-  fun getUserProfile(onUserProfileReceived: (UserProfile?, Throwable?) -> Unit) {
-    onUserProfileReceived(UserProfile("mail@mail.com", "Filip", 10), null)
-  }
+    }
 }

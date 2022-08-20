@@ -54,56 +54,54 @@ import kotlinx.android.synthetic.main.activity_login.*
  */
 class LoginActivity : AppCompatActivity() {
 
-  private val remoteApi = RemoteApi()
-  private val networkStatusChecker by lazy {
-    NetworkStatusChecker(getSystemService(ConnectivityManager::class.java))
-  }
-
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_login)
-    initUi()
-
-    if (App.getToken().isNotBlank()) {
-      startActivity(MainActivity.getIntent(this))
+    private val remoteApi = App.remoteApi
+    private val networkStatusChecker by lazy {
+        NetworkStatusChecker(getSystemService(ConnectivityManager::class.java))
     }
-  }
 
-  private fun initUi() {
-    login.setOnClickListener {
-      val email = emailInput.text.toString()
-      val password = passwordInput.text.toString()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_login)
+        initUi()
 
-      if (email.isNotBlank() && password.isNotBlank()) {
-        logUserIn(UserDataRequest(email, password))
-      } else {
-        showLoginError()
-      }
-    }
-    register.setOnClickListener { startActivity(Intent(this, RegisterActivity::class.java)) }
-  }
-
-  private fun logUserIn(userDataRequest: UserDataRequest) {
-    networkStatusChecker.performIfConnectedToInternet {
-      remoteApi.loginUser(userDataRequest) { token: String?, throwable: Throwable? ->
-        runOnUiThread {
-          if (token != null && token.isNotBlank()) {
-            onLoginSuccess(token)
-          } else if (throwable != null) {
-            showLoginError()
-          }
+        if (App.getToken().isNotBlank()) {
+            startActivity(MainActivity.getIntent(this))
         }
-      }
     }
-  }
 
-  private fun onLoginSuccess(token: String) {
-    errorText.gone()
-    App.saveToken(token)
-    startActivity(MainActivity.getIntent(this))
-  }
+    private fun initUi() {
+        login.setOnClickListener {
+            val email = emailInput.text.toString()
+            val password = passwordInput.text.toString()
 
-  private fun showLoginError() {
-    errorText.visible()
-  }
+            if (email.isNotBlank() && password.isNotBlank()) {
+                logUserIn(UserDataRequest(email, password))
+            } else {
+                showLoginError()
+            }
+        }
+        register.setOnClickListener { startActivity(Intent(this, RegisterActivity::class.java)) }
+    }
+
+    private fun logUserIn(userDataRequest: UserDataRequest) {
+        networkStatusChecker.performIfConnectedToInternet {
+            remoteApi.loginUser(userDataRequest) { token: String?, throwable: Throwable? ->
+                if (token != null && token.isNotBlank()) {
+                    onLoginSuccess(token)
+                } else if (throwable != null) {
+                    showLoginError()
+                }
+            }
+        }
+    }
+
+    private fun onLoginSuccess(token: String) {
+        errorText.gone()
+        App.saveToken(token)
+        startActivity(MainActivity.getIntent(this))
+    }
+
+    private fun showLoginError() {
+        errorText.visible()
+    }
 }
