@@ -34,7 +34,10 @@
 
 package com.raywenderlich.android.taskie.model
 
+import kotlinx.serialization.Serializable
+
 /**
  * Full user data.
  */
+
 class UserProfile(val email: String, val name: String, val numberOfNotes: Int)

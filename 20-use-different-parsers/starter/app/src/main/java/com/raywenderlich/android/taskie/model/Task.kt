@@ -34,15 +34,19 @@
 
 package com.raywenderlich.android.taskie.model
 
-import com.squareup.moshi.Json
+import androidx.annotation.Keep
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+
 
 /**
  * Represents a task/note from the API.
  */
+@Serializable
 class Task(
-    @field:Json(name = "id") val id: String,
-    @field:Json(name = "title") val title: String,
-    @field:Json(name = "content") val content: String,
-    @field:Json(name = "isCompleted") val isCompleted: Boolean,
-    @field:Json(name = "taskPriority") val taskPriority: Int
+    @SerialName(value = "id") val id: String,
+    @SerialName(value = "title") val title: String,
+    @SerialName(value = "content") val content: String,
+    @SerialName(value = "isCompleted") val isCompleted: Boolean,
+    @SerialName(value = "taskPriority") val taskPriority: Int
 )

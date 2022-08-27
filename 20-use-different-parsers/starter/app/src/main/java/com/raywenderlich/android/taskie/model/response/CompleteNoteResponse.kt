@@ -1,8 +1,11 @@
 package com.raywenderlich.android.taskie.model.response
 
-import com.squareup.moshi.Json
+import androidx.annotation.Keep
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
 /**
  * Holds a message response after a note is completed.
  */
-class CompleteNoteResponse(@field:Json(name = "message") val message: String?)
+@Serializable
+class CompleteNoteResponse(@SerialName(value = "message") val message: String?)

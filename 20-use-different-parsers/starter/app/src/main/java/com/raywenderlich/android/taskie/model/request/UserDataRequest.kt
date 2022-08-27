@@ -34,10 +34,13 @@
 
 package com.raywenderlich.android.taskie.model.request
 
-import com.squareup.moshi.Json
+import androidx.annotation.Keep
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
 
+@Serializable
 data class UserDataRequest(
-    @field:Json(name = "email") val email: String,
-    @field:Json(name = "password") val password: String,
-    @field:Json(name = "name") val name: String? = null
+    @SerialName(value = "email") val email: String,
+    @SerialName(value = "password") val password: String,
+    @SerialName(value = "name") val name: String? = null
 )

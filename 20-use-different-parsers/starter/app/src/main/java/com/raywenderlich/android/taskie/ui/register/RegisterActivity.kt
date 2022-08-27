@@ -40,6 +40,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.raywenderlich.android.taskie.App
 import com.raywenderlich.android.taskie.R
 import com.raywenderlich.android.taskie.model.request.UserDataRequest
+import com.raywenderlich.android.taskie.model.response.Success
 import com.raywenderlich.android.taskie.networking.NetworkStatusChecker
 import com.raywenderlich.android.taskie.utils.gone
 import com.raywenderlich.android.taskie.utils.toast
@@ -73,11 +74,11 @@ class RegisterActivity : AppCompatActivity() {
   private fun processData(username: String, email: String, password: String) {
     if (username.isNotBlank() && email.isNotBlank() && password.isNotBlank()) {
       networkStatusChecker.performIfConnectedToInternet {
-        remoteApi.registerUser(UserDataRequest(email, password, username)) { message, error ->
-          if (message != null) {
-            toast(message)
+        remoteApi.registerUser(UserDataRequest(email, password, username)) { result ->
+          if (result is Success) {
+            toast(result.data)
             onRegisterSuccess()
-          } else if (error != null) {
+          } else  {
             onRegisterError()
           }
         }
