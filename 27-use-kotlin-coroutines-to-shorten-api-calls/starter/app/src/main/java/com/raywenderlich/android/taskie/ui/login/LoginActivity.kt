@@ -48,60 +48,66 @@ import com.raywenderlich.android.taskie.ui.register.RegisterActivity
 import com.raywenderlich.android.taskie.utils.gone
 import com.raywenderlich.android.taskie.utils.visible
 import kotlinx.android.synthetic.main.activity_login.*
+import kotlinx.coroutines.DelicateCoroutinesApi
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /**
  * Displays the Login screen, with the options to head over to the Register screen.
  */
 class LoginActivity : AppCompatActivity() {
 
-  private val remoteApi = App.remoteApi
-  private val networkStatusChecker by lazy {
-    NetworkStatusChecker(getSystemService(ConnectivityManager::class.java))
-  }
-
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    setContentView(R.layout.activity_login)
-    initUi()
-
-    if (App.getToken().isNotBlank()) {
-      startActivity(MainActivity.getIntent(this))
+    private val remoteApi = App.remoteApi
+    private val networkStatusChecker by lazy {
+        NetworkStatusChecker(getSystemService(ConnectivityManager::class.java))
     }
-  }
 
-  private fun initUi() {
-    login.setOnClickListener {
-      val email = emailInput.text.toString()
-      val password = passwordInput.text.toString()
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_login)
+        initUi()
 
-      if (email.isNotBlank() && password.isNotBlank()) {
-        logUserIn(UserDataRequest(email, password))
-      } else {
-        showLoginError()
-      }
-    }
-    register.setOnClickListener { startActivity(Intent(this, RegisterActivity::class.java)) }
-  }
-
-  private fun logUserIn(userDataRequest: UserDataRequest) {
-    networkStatusChecker.performIfConnectedToInternet {
-      remoteApi.loginUser(userDataRequest) { result ->
-        if (result is Success) {
-          onLoginSuccess(result.data)
-        } else {
-          showLoginError()
+        if (App.getToken().isNotBlank()) {
+            startActivity(MainActivity.getIntent(this))
         }
-      }
     }
-  }
 
-  private fun onLoginSuccess(token: String) {
-    errorText.gone()
-    App.saveToken(token)
-    startActivity(MainActivity.getIntent(this))
-  }
+    private fun initUi() {
+        login.setOnClickListener {
+            val email = emailInput.text.toString()
+            val password = passwordInput.text.toString()
 
-  private fun showLoginError() {
-    errorText.visible()
-  }
+            if (email.isNotBlank() && password.isNotBlank()) {
+                logUserIn(UserDataRequest(email, password))
+            } else {
+                showLoginError()
+            }
+        }
+        register.setOnClickListener { startActivity(Intent(this, RegisterActivity::class.java)) }
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun logUserIn(userDataRequest: UserDataRequest) {
+        networkStatusChecker.performIfConnectedToInternet {
+            GlobalScope.launch(Dispatchers.Main) {
+                val result = remoteApi.loginUser(userDataRequest)
+                if (result is Success) {
+                    onLoginSuccess(result.data)
+                } else {
+                    showLoginError()
+                }
+            }
+        }
+    }
+
+    private fun onLoginSuccess(token: String) {
+        errorText.gone()
+        App.saveToken(token)
+        startActivity(MainActivity.getIntent(this))
+    }
+
+    private fun showLoginError() {
+        errorText.visible()
+    }
 }

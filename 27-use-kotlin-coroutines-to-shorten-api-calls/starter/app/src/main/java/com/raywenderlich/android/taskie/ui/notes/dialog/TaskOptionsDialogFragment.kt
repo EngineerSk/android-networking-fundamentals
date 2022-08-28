@@ -43,87 +43,98 @@ import android.view.WindowManager
 import androidx.fragment.app.DialogFragment
 import com.raywenderlich.android.taskie.App
 import com.raywenderlich.android.taskie.R
+import com.raywenderlich.android.taskie.model.Failure
 import com.raywenderlich.android.taskie.model.Success
 import com.raywenderlich.android.taskie.networking.NetworkStatusChecker
 import kotlinx.android.synthetic.main.fragment_dialog_task_options.*
+import kotlinx.coroutines.*
 
 /**
  * Displays the options to delete or complete a task.
  */
 class TaskOptionsDialogFragment : DialogFragment() {
 
-  private var taskOptionSelectedListener: TaskOptionSelectedListener? = null
+    private var taskOptionSelectedListener: TaskOptionSelectedListener? = null
 
-  private val remoteApi = App.remoteApi
-  private val networkStatusChecker by lazy {
-    NetworkStatusChecker(activity?.getSystemService(ConnectivityManager::class.java))
-  }
-
-  companion object {
-    private const val KEY_TASK_ID = "task_id"
-
-    fun newInstance(taskId: String): TaskOptionsDialogFragment = TaskOptionsDialogFragment().apply {
-      arguments = Bundle().apply {
-        putString(KEY_TASK_ID, taskId)
-      }
+    private val remoteApi = App.remoteApi
+    private val networkStatusChecker by lazy {
+        NetworkStatusChecker(activity?.getSystemService(ConnectivityManager::class.java))
     }
-  }
 
-  interface TaskOptionSelectedListener {
-    fun onTaskDeleted(taskId: String)
+    companion object {
+        private const val KEY_TASK_ID = "task_id"
 
-    fun onTaskCompleted(taskId: String)
-  }
+        fun newInstance(taskId: String): TaskOptionsDialogFragment =
+            TaskOptionsDialogFragment().apply {
+                arguments = Bundle().apply {
+                    putString(KEY_TASK_ID, taskId)
+                }
+            }
+    }
 
-  override fun onCreate(savedInstanceState: Bundle?) {
-    super.onCreate(savedInstanceState)
-    setStyle(STYLE_NO_TITLE, R.style.FragmentDialogTheme)
-  }
+    interface TaskOptionSelectedListener {
+        fun onTaskDeleted(taskId: String)
 
-  override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
-      savedInstanceState: Bundle?): View? {
-    return inflater.inflate(R.layout.fragment_dialog_task_options, container)
-  }
+        fun onTaskCompleted(taskId: String)
+    }
 
-  override fun onStart() {
-    super.onStart()
-    dialog?.window?.setLayout(WindowManager.LayoutParams.MATCH_PARENT,
-        WindowManager.LayoutParams.WRAP_CONTENT)
-  }
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setStyle(STYLE_NO_TITLE, R.style.FragmentDialogTheme)
+    }
 
-  override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-    super.onViewCreated(view, savedInstanceState)
-    initUi()
-  }
+    override fun onCreateView(
+        inflater: LayoutInflater, container: ViewGroup?,
+        savedInstanceState: Bundle?
+    ): View? {
+        return inflater.inflate(R.layout.fragment_dialog_task_options, container)
+    }
 
-  private fun initUi() {
-    val taskId = arguments?.getString(KEY_TASK_ID) ?: ""
-    if (taskId.isEmpty()) dismissAllowingStateLoss()
+    override fun onStart() {
+        super.onStart()
+        dialog?.window?.setLayout(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.WRAP_CONTENT
+        )
+    }
 
-    deleteTask.setOnClickListener {
-      networkStatusChecker.performIfConnectedToInternet {
-        remoteApi.deleteTask(taskId) { result ->
-          if (result is Success) {
-            taskOptionSelectedListener?.onTaskDeleted(taskId)
-          }
-          dismissAllowingStateLoss()
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+        initUi()
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    private fun initUi() {
+        val taskId = arguments?.getString(KEY_TASK_ID) ?: ""
+        if (taskId.isEmpty()) dismissAllowingStateLoss()
+
+        deleteTask.setOnClickListener {
+            networkStatusChecker.performIfConnectedToInternet {
+                GlobalScope.launch(Dispatchers.Main) {
+                    val result = remoteApi.deleteTask(taskId)
+                    if (result is Success) {
+                        taskOptionSelectedListener?.onTaskDeleted(taskId)
+                    }
+                    dismissAllowingStateLoss()
+                }
+
+            }
         }
-      }
-    }
 
-    completeTask.setOnClickListener {
-      networkStatusChecker.performIfConnectedToInternet {
-        remoteApi.completeTask(taskId) { error ->
-          if (error == null) {
-            taskOptionSelectedListener?.onTaskCompleted(taskId)
-          }
-          dismissAllowingStateLoss()
+        completeTask.setOnClickListener {
+            networkStatusChecker.performIfConnectedToInternet {
+                GlobalScope.launch(Dispatchers.Main) {
+                    val result = remoteApi.completeTask(taskId)
+                    if(result is Success){
+                        taskOptionSelectedListener?.onTaskCompleted(taskId)
+                    }
+                    dismissAllowingStateLoss()
+                }
+            }
         }
-      }
     }
-  }
 
-  fun setTaskOptionSelectedListener(taskOptionSelectedListener: TaskOptionSelectedListener) {
-    this.taskOptionSelectedListener = taskOptionSelectedListener
-  }
+    fun setTaskOptionSelectedListener(taskOptionSelectedListener: TaskOptionSelectedListener) {
+        this.taskOptionSelectedListener = taskOptionSelectedListener
+    }
 }
